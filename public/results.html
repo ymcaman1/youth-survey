@@ -6,6 +6,7 @@
 <title>만족도 조사 · 결과 보기</title>
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
 <style>
   :root{--ink:#23243a;--accent:#ff5d73;--accent2:#ffb03a;--mint:#2fc6a0;--blue:#4f7dff;--line:#e8e2d5;--card:#fff;}
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -88,8 +89,9 @@
     <p class="sub">2026 포천·가평 청소년자치기구</p>
 
     <!-- 캡처용 리포트 영역 -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
       <button class="dl" onclick="saveReportImage()">📸 결과 이미지로 저장</button>
+      <button class="dl" style="background:linear-gradient(135deg,#4f7dff,#2fc6a0);" onclick="downloadWordReport()">📄 Word 분석 보고서</button>
     </div>
     <div id="reportArea" class="report">
       <div class="reportHead">
@@ -261,6 +263,180 @@ async function saveReportImage(){
     link.click();
   }catch(e){
     alert("이미지 저장 중 문제가 생겼어요. 화면을 직접 캡처해 주세요. ("+e.message+")");
+  }
+}
+
+// ===== Word 분석 보고서 생성 =====
+function analyzeData(){
+  const rows = DATA.rows;
+  const qkeys = rows.length ? Object.keys(rows[0].answers) : [];
+  const scaleItems = [];   // 점수형
+  const choiceItems = [];  // 객관식(소속/정례화 등)
+  const textItems = [];    // 주관식
+  let totalSum=0, totalCnt=0;
+
+  qkeys.forEach(k=>{
+    const sample = rows[0].answers[k];
+    const sec = sample.section || "기타";
+    const q = stripEmoji(sample.question);
+    const vals = rows.map(r=>r.answers[k]?.answer).filter(v=>v!==undefined && v!=="");
+    if(typeof sample.answer==="number"){
+      const nums = vals.filter(v=>typeof v==="number");
+      const avg = nums.length? nums.reduce((a,b)=>a+(+b),0)/nums.length : 0;
+      const dist = {1:0,2:0,3:0,4:0,5:0};
+      nums.forEach(n=>{ if(dist[n]!==undefined) dist[n]++; });
+      scaleItems.push({sec,q,avg,n:nums.length,dist});
+      totalSum+=avg*nums.length; totalCnt+=nums.length;
+    } else {
+      // 주관식 vs 객관식 구분: 응답이 정해진 보기 몇 개로만 이뤄지면 객관식, 자유서술이면 주관식
+      const uniq = [...new Set(vals.map(v=>String(v)))];
+      const isChoice = uniq.length>0 && uniq.length<=8 && vals.every(v=>String(v).length<25) && uniq.length < vals.length;
+      // 자유 의견 섹션의 서술형은 주관식으로
+      if(sec==="자유 의견" && !isChoice){
+        textItems.push({q, answers: vals.filter(v=>typeof v==="string" && v.trim()!=="")});
+      } else if(sec==="자유 의견" && q.indexOf("정기적")>=0){
+        // 정례화 객관식
+        const counts={}; vals.forEach(v=>{ counts[v]=(counts[v]||0)+1; });
+        choiceItems.push({sec,q,counts,n:vals.length});
+      } else {
+        const counts={}; vals.forEach(v=>{ counts[v]=(counts[v]||0)+1; });
+        choiceItems.push({sec,q,counts,n:vals.length});
+      }
+    }
+  });
+  return {rows, scaleItems, choiceItems, textItems, overall: totalCnt?totalSum/totalCnt:0};
+}
+
+async function downloadWordReport(){
+  if(typeof docx==="undefined"){
+    alert("보고서 생성 도구를 불러오지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.");
+    return;
+  }
+  if(!DATA || !DATA.rows.length){ alert("응답 데이터가 없어요."); return; }
+
+  const D = docx;
+  const A = analyzeData();
+  const today = new Date().toISOString().slice(0,10);
+  const FONT = "맑은 고딕";
+  const NAVY = "1F4E79";
+
+  const P = (text, opts={}) => new D.Paragraph({
+    spacing:{after: opts.after??120, before: opts.before??0},
+    alignment: opts.align,
+    children:[new D.TextRun({text, font:FONT, size:opts.size??22, bold:opts.bold, color:opts.color, italics:opts.italics})]
+  });
+  const H = (text) => new D.Paragraph({
+    spacing:{before:280, after:140},
+    border:{bottom:{style:D.BorderStyle.SINGLE, size:10, color:NAVY, space:4}},
+    children:[new D.TextRun({text, font:FONT, size:28, bold:true, color:NAVY})]
+  });
+
+  const children = [];
+
+  // 표지/제목
+  children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER, spacing:{after:60},
+    children:[new D.TextRun({text:"2026년 포천시·가평군 청소년자치기구", font:FONT, size:24, bold:true, color:NAVY})]}));
+  children.push(new D.Paragraph({alignment:D.AlignmentType.CENTER, spacing:{after:200},
+    children:[new D.TextRun({text:"연합 교류활동 만족도 조사 결과 분석 보고서", font:FONT, size:36, bold:true, color:NAVY})]}));
+  children.push(P(`작성일: ${today}    |    응답 인원: ${A.rows.length}명    |    전체 평균 만족도: ${A.overall.toFixed(2)} / 5점`, {align:D.AlignmentType.CENTER, after:240, color:"595959"}));
+
+  // 1. 개요
+  children.push(H("Ⅰ. 조사 개요"));
+  children.push(P("본 보고서는 2026년 포천시·가평군 청소년자치기구 연합 교류활동에 참여한 청소년을 대상으로 실시한 만족도 조사 결과를 분석한 것이다. 조사는 모바일 설문 방식으로 진행되었으며, 전반적 만족도·프로그램별 만족도·활동 성과(정량)와 자유 의견(정성)으로 구성되었다."));
+  children.push(P(`총 ${A.rows.length}명이 응답하였으며, 전체 문항 평균 만족도는 5점 만점에 ${A.overall.toFixed(2)}점(${Math.round(A.overall/5*100)}%)으로 나타났다.`));
+
+  // 2. 정량 분석 - 섹션별 요약
+  children.push(H("Ⅱ. 정량 분석 결과"));
+  // 섹션 평균 요약
+  const secMap={};
+  A.scaleItems.forEach(it=>{ (secMap[it.sec]=secMap[it.sec]||[]).push(it); });
+  const secOrder=["전반적 만족도","프로그램별","오늘의 수확","기타"];
+  const secNames=Object.keys(secMap).sort((a,b)=>(secOrder.indexOf(a)<0?9:secOrder.indexOf(a))-(secOrder.indexOf(b)<0?9:secOrder.indexOf(b)));
+
+  children.push(P("1. 영역별 평균 만족도", {bold:true, size:24, before:120}));
+  secNames.forEach(sec=>{
+    const items=secMap[sec];
+    const savg=items.reduce((s,i)=>s+i.avg,0)/items.length;
+    children.push(P(`• ${sec}: 평균 ${savg.toFixed(2)}점 (${Math.round(savg/5*100)}%)`, {after:60}));
+  });
+
+  // 문항별 간단 표 (평균 + 만족비율만)
+  children.push(P("2. 문항별 평균 점수", {bold:true, size:24, before:200}));
+  const headerCell=(t,w)=>new D.TableCell({width:{size:w,type:D.WidthType.DXA}, shading:{fill:NAVY}, margins:{top:50,bottom:50,left:90,right:90},
+    children:[new D.Paragraph({alignment:D.AlignmentType.CENTER, children:[new D.TextRun({text:t,font:FONT,size:17,bold:true,color:"FFFFFF"})]})]});
+  const cell=(t,w,al,shade)=>new D.TableCell({width:{size:w,type:D.WidthType.DXA}, margins:{top:50,bottom:50,left:90,right:90}, shading: shade?{fill:shade}:undefined,
+    children:[new D.Paragraph({alignment:al||D.AlignmentType.LEFT, children:[new D.TextRun({text:String(t),font:FONT,size:17})]})]});
+
+  const W=[5400,1200,1400];
+  const tableRows=[new D.TableRow({tableHeader:true, children:[
+    headerCell("문항",W[0]),headerCell("평균",W[1]),headerCell("만족도",W[2])
+  ]})];
+  secNames.forEach(sec=>{
+    // 섹션 구분 행
+    tableRows.push(new D.TableRow({children:[
+      new D.TableCell({columnSpan:3, width:{size:8000,type:D.WidthType.DXA}, shading:{fill:"EAF0F7"}, margins:{top:40,bottom:40,left:90,right:90},
+        children:[new D.Paragraph({children:[new D.TextRun({text:"〈 "+sec+" 〉", font:FONT, size:16, bold:true, color:NAVY})]})]})
+    ]}));
+    secMap[sec].forEach(it=>{
+      tableRows.push(new D.TableRow({children:[
+        cell(it.q,W[0]),
+        cell(it.avg.toFixed(2),W[1],D.AlignmentType.CENTER),
+        cell(Math.round(it.avg/5*100)+"%",W[2],D.AlignmentType.CENTER)
+      ]}));
+    });
+  });
+  children.push(new D.Table({width:{size:8000,type:D.WidthType.DXA}, columnWidths:W, rows:tableRows}));
+
+  // 응답자 구성 한 줄 요약
+  if(A.choiceItems.length){
+    children.push(P("3. 응답자 구성", {bold:true, size:24, before:240}));
+    A.choiceItems.forEach(ci=>{
+      const parts=Object.entries(ci.counts).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${v}명(${Math.round(v/ci.n*100)}%)`);
+      children.push(P(`• ${ci.q}: ${parts.join(" · ")}`, {after:60, size:20}));
+    });
+  }
+
+  // 3. 정성 분석 (주관식)
+  children.push(H("Ⅲ. 정성 분석 결과 (자유 의견)"));
+  children.push(P("청소년들이 직접 작성한 주관식 응답을 문항별로 정리하였다. 응답은 원문 그대로 수록하였다.", {italics:true, color:"595959"}));
+
+  A.textItems.forEach((ti, idx)=>{
+    children.push(P(`${idx+1}. ${ti.q}`, {bold:true, size:24, before:200, color:NAVY}));
+    if(!ti.answers.length){
+      children.push(P("   (응답 없음)", {color:"888888", after:80}));
+    }else{
+      ti.answers.forEach(ans=>{
+        children.push(new D.Paragraph({
+          spacing:{after:60}, indent:{left:300},
+          bullet:{level:0},
+          children:[new D.TextRun({text:ans, font:FONT, size:21})]
+        }));
+      });
+    }
+  });
+
+  // 4. 종합 의견
+  children.push(H("Ⅳ. 종합 및 제언"));
+  const best = [...A.scaleItems].sort((a,b)=>b.avg-a.avg)[0];
+  const worst = [...A.scaleItems].sort((a,b)=>a.avg-b.avg)[0];
+  children.push(P(`전체 평균 만족도는 ${A.overall.toFixed(2)}점으로, 참여 청소년들은 본 교류활동에 대해 ${A.overall>=4?"전반적으로 높은 만족도를":"보통 이상의 만족도를"} 보였다.`));
+  if(best) children.push(P(`가장 높은 평가를 받은 항목은 「${best.q}」(${best.avg.toFixed(2)}점)였으며, 상대적으로 낮은 항목은 「${worst.q}」(${worst.avg.toFixed(2)}점)로 나타나 향후 개선이 필요한 부분으로 판단된다.`));
+  children.push(P("자유 의견에서 제시된 청소년들의 제안은 차기 활동 기획 시 반영하여, 보다 만족도 높은 교류활동을 운영할 수 있도록 한다.", {after:200}));
+  children.push(P("※ 본 보고서는 설문 응답 데이터를 기반으로 자동 생성되었습니다.", {size:16, color:"999999", align:D.AlignmentType.RIGHT}));
+
+  const doc = new D.Document({
+    styles:{default:{document:{run:{font:FONT, size:22}}}},
+    sections:[{properties:{page:{margin:{top:1100,right:1100,bottom:1100,left:1100}}}, children}]
+  });
+
+  try{
+    const blob = await D.Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href=url; a.download="만족도조사_분석보고서_"+today+".docx"; a.click();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    alert("보고서 생성 중 오류: "+e.message);
   }
 }
 
