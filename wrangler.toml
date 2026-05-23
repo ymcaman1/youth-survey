@@ -1,0 +1,7 @@
+# wrangler.toml
+# Cloudflare Pages 프로젝트 기본 설정
+# (D1 데이터베이스 연결은 Cloudflare 대시보드 → Settings → Bindings 에서 클릭으로 설정합니다)
+
+name = "youth-survey"
+pages_build_output_dir = "public"
+compatibility_date = "2026-05-01"
