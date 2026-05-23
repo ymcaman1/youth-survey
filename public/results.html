@@ -29,7 +29,7 @@
   .barRow .val{flex:0 0 54px;text-align:right;font-family:'Jua';color:var(--blue);}
 
   /* ===== 캡처용 결과 요약 ===== */
-  .report{background:linear-gradient(160deg,#fffdf8,#fff6ec);border:2px solid #ffe3c2;border-radius:24px;padding:30px 30px 26px;margin-bottom:24px;box-shadow:0 14px 36px -20px rgba(180,120,40,.4);}
+  .report{background:linear-gradient(150deg,#fff7e6,#ffeede 55%,#eafaf2);border:2px solid #ffe3c2;border-radius:24px;padding:30px 26px 22px;margin-bottom:24px;box-shadow:0 14px 36px -20px rgba(180,120,40,.4);}
   .reportHead{text-align:center;margin-bottom:6px;}
   .reportHead .badge{display:inline-block;background:#fff0d6;color:#c9821b;font-family:'Jua';font-size:.78rem;padding:5px 14px;border-radius:20px;border:1.5px solid #ffd98a;margin-bottom:10px;}
   .reportHead h2{font-family:'Jua';font-size:1.5rem;color:#1f4e79;margin-bottom:4px;}
@@ -40,9 +40,10 @@
   .hero .lab{color:#8d8169;font-size:.82rem;margin-top:6px;}
   .hero .stars{font-size:1rem;margin-top:5px;letter-spacing:1px;}
 
-  .secGroup{margin-bottom:18px;}
-  .secTitle{font-family:'Jua';font-size:1rem;color:#c9821b;margin:0 0 10px;display:flex;align-items:center;gap:7px;}
-  .secTitle::before{content:"";width:7px;height:18px;background:linear-gradient(180deg,#ffb03a,#ff7a59);border-radius:4px;display:inline-block;}
+  .secGroup{background:#fff;border-radius:18px;padding:18px 20px 14px;margin-bottom:14px;box-shadow:0 8px 22px -16px rgba(120,80,30,.35);border:1.5px solid #fff0dc;}
+  .secTitle{font-family:'Jua';font-size:1.05rem;color:#c9821b;margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+  .secTitle .secIcon{font-size:1.1rem;}
+  .secTitle .secAvg{margin-left:auto;font-size:.82rem;background:#fff3e0;color:#e8820e;border-radius:20px;padding:4px 12px;border:1.5px solid #ffd98a;}
   .itemRow{display:flex;align-items:center;gap:12px;margin-bottom:11px;}
   .itemRow .name{flex:0 0 44%;font-size:.92rem;color:#403a2e;line-height:1.35;}
   .itemRow .barBox{flex:1;height:24px;background:#e8ddca;border-radius:12px;overflow:hidden;position:relative;box-shadow:inset 0 1px 3px rgba(0,0,0,.08);display:block;}
@@ -198,6 +199,7 @@ function render(){
     </div>`;
 
   // 섹션별 막대
+  const secIcons = {"전반적 만족도":"🌟","프로그램별":"🎯","오늘의 수확":"🌱","기타":"📌"};
   let html = "";
   const order = ["전반적 만족도","프로그램별","오늘의 수확","기타"];
   const secNames = Object.keys(sections).sort((a,b)=>{
@@ -205,8 +207,11 @@ function render(){
     return (ia<0?99:ia) - (ib<0?99:ib);
   });
   secNames.forEach(sec => {
-    html += `<div class="secGroup"><div class="secTitle">${sec}</div>`;
-    sections[sec].forEach(it => {
+    const items = sections[sec];
+    const secAvg = items.reduce((s,it)=>s+it.avg,0)/items.length;
+    const icon = secIcons[sec] || "📌";
+    html += `<div class="secGroup"><div class="secTitle"><span class="secIcon">${icon}</span>${sec}<span class="secAvg">평균 ${secAvg.toFixed(2)}점</span></div>`;
+    items.forEach(it => {
       const pct = (it.avg/5*100).toFixed(0);
       html += `<div class="itemRow">
         <span class="name">${it.q}</span>
