@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>만족도 조사 · 결과 보기</title>
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{--ink:#23243a;--accent:#ff5d73;--accent2:#ffb03a;--mint:#2fc6a0;--blue:#4f7dff;--line:#e8e2d5;--card:#fff;}
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -26,6 +27,29 @@
   .barRow .track{flex:1;height:18px;background:#f1ead8;border-radius:10px;overflow:hidden;}
   .barRow .fill{height:100%;border-radius:10px;background:linear-gradient(90deg,var(--mint),var(--blue));}
   .barRow .val{flex:0 0 54px;text-align:right;font-family:'Jua';color:var(--blue);}
+
+  /* ===== 캡처용 결과 요약 ===== */
+  .report{background:linear-gradient(160deg,#fffdf8,#fff6ec);border:2px solid #ffe3c2;border-radius:24px;padding:30px 30px 26px;margin-bottom:24px;box-shadow:0 14px 36px -20px rgba(180,120,40,.4);}
+  .reportHead{text-align:center;margin-bottom:6px;}
+  .reportHead .badge{display:inline-block;background:#fff0d6;color:#c9821b;font-family:'Jua';font-size:.78rem;padding:5px 14px;border-radius:20px;border:1.5px solid #ffd98a;margin-bottom:10px;}
+  .reportHead h2{font-family:'Jua';font-size:1.5rem;color:#1f4e79;margin-bottom:4px;}
+  .reportHead .date{color:#a89a7d;font-size:.85rem;}
+  .heroRow{display:flex;gap:16px;justify-content:center;margin:20px 0 26px;flex-wrap:wrap;}
+  .hero{background:#fff;border-radius:18px;padding:18px 26px;text-align:center;min-width:130px;box-shadow:0 8px 20px -14px rgba(60,40,20,.3);}
+  .hero .big{font-family:'Jua';font-size:2.4rem;line-height:1;background:linear-gradient(135deg,#ff7a59,#ffb03a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  .hero .lab{color:#8d8169;font-size:.82rem;margin-top:6px;}
+  .hero .stars{font-size:1rem;margin-top:5px;letter-spacing:1px;}
+
+  .secGroup{margin-bottom:18px;}
+  .secTitle{font-family:'Jua';font-size:1rem;color:#c9821b;margin:0 0 10px;display:flex;align-items:center;gap:7px;}
+  .secTitle::before{content:"";width:7px;height:18px;background:linear-gradient(180deg,#ffb03a,#ff7a59);border-radius:4px;display:inline-block;}
+  .itemRow{display:flex;align-items:center;gap:12px;margin-bottom:11px;}
+  .itemRow .name{flex:0 0 44%;font-size:.92rem;color:#403a2e;line-height:1.35;}
+  .itemRow .barBox{flex:1;height:24px;background:#e8ddca;border-radius:12px;overflow:hidden;position:relative;box-shadow:inset 0 1px 3px rgba(0,0,0,.08);display:block;}
+  .itemRow .bar{display:block;height:100%;border-radius:12px;min-width:8px;box-shadow:0 1px 4px rgba(0,0,0,.12);}
+  .itemRow .score{flex:0 0 96px;text-align:right;font-family:'Jua';font-size:1rem;}
+  .itemRow .score .pt{font-size:.7rem;color:#a89a7d;font-family:'Gowun Dodum';margin-left:2px;}
+  .itemRow .ministar{font-size:.7rem;letter-spacing:0;margin-left:6px;}
   table{width:100%;border-collapse:collapse;font-size:.84rem;}
   th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top;}
   th{background:#1f4e79;color:#fff;font-weight:normal;position:sticky;top:0;}
@@ -62,11 +86,18 @@
     <h1>📊 연합 교류활동 만족도 조사 · 결과</h1>
     <p class="sub">2026 포천·가평 청소년자치기구</p>
 
-    <div class="cards" id="statCards"></div>
-
-    <div class="panel">
-      <h2>📈 문항별 평균 점수 (5점 만점)</h2>
-      <div id="avgBars"></div>
+    <!-- 캡처용 리포트 영역 -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+      <button class="dl" onclick="saveReportImage()">📸 결과 이미지로 저장</button>
+    </div>
+    <div id="reportArea" class="report">
+      <div class="reportHead">
+        <span class="badge">만족도 조사 결과 요약</span>
+        <h2>2026 포천·가평 청소년자치기구 연합 교류활동</h2>
+        <div class="date" id="reportDate"></div>
+      </div>
+      <div class="heroRow" id="heroRow"></div>
+      <div id="sections"></div>
     </div>
 
     <div class="panel">
@@ -115,26 +146,77 @@ async function load(){
 function render(){
   const rows=DATA.rows;
   // 통계 카드
-  document.getElementById("statCards").innerHTML=`
-    <div class="stat"><div class="n">${rows.length}</div><div class="l">총 응답 수</div></div>
-    <div class="stat"><div class="n">${overallAvg(rows)}</div><div class="l">전체 평균 만족도</div></div>
-    <div class="stat"><div class="n">${rows[0]?rows[0].created_at.slice(0,10):"-"}</div><div class="l">최근 응답일</div></div>`;
+  // ===== 캡처용 리포트 렌더링 =====
+  document.getElementById("reportDate").textContent =
+    "응답 " + rows.length + "명 · 기준일 " + (rows[0] ? rows[0].created_at.slice(0,10) : "-");
 
-  // 문항별 평균(점수형 문항만)
   const qkeys = rows.length ? Object.keys(rows[0].answers) : [];
-  let barsHtml="";
-  qkeys.forEach(k=>{
-    const sample=rows[0].answers[k];
-    const nums=rows.map(r=>r.answers[k]?.answer).filter(v=>typeof v==="number" || (!isNaN(parseFloat(v))&&isFinite(v)&&v!==""));
-    if(nums.length && typeof sample.answer==="number"){
-      const avg=(nums.reduce((a,b)=>a+(+b),0)/nums.length).toFixed(2);
-      const pct=(avg/5*100).toFixed(0);
-      barsHtml+=`<div class="barRow"><span class="q">${stripEmoji(sample.question)}</span>
-        <span class="track"><span class="fill" style="width:${pct}%"></span></span>
-        <span class="val">${avg}점</span></div>`;
+
+  // 점수형 문항만 골라 섹션별로 그룹핑
+  const sections = {}; // {섹션명: [{question, avg}]}
+  let totalSum = 0, totalCnt = 0;
+  qkeys.forEach(k => {
+    const sample = rows[0].answers[k];
+    const nums = rows.map(r => r.answers[k]?.answer).filter(v => typeof v === "number");
+    if (nums.length && typeof sample.answer === "number") {
+      const avg = nums.reduce((a,b)=>a+(+b),0) / nums.length;
+      const sec = sample.section || "기타";
+      (sections[sec] = sections[sec] || []).push({ q: stripEmoji(sample.question), avg });
+      totalSum += avg * nums.length;
+      totalCnt += nums.length;
     }
   });
-  document.getElementById("avgBars").innerHTML=barsHtml || '<p class="msg">점수형 응답이 아직 없어요.</p>';
+
+  const overall = totalCnt ? (totalSum/totalCnt) : 0;
+
+  // 점수→색상 (낮으면 주황, 높으면 초록계열)
+  function barColor(avg){
+    if(avg >= 4.5) return "linear-gradient(90deg,#2fc6a0,#22a8d6)";
+    if(avg >= 4.0) return "linear-gradient(90deg,#7ac74f,#2fc6a0)";
+    if(avg >= 3.0) return "linear-gradient(90deg,#ffc24b,#7ac74f)";
+    return "linear-gradient(90deg,#ff8a5c,#ffc24b)";
+  }
+  function stars(avg){
+    const full = Math.round(avg);
+    return "★".repeat(full) + "☆".repeat(5-full);
+  }
+
+  // 상단 핵심 지표
+  document.getElementById("heroRow").innerHTML = `
+    <div class="hero">
+      <div class="big">${overall.toFixed(2)}</div>
+      <div class="lab">전체 평균 만족도</div>
+      <div class="stars" style="color:#ffb03a;">${stars(overall)}</div>
+    </div>
+    <div class="hero">
+      <div class="big">${rows.length}</div>
+      <div class="lab">총 응답 인원</div>
+    </div>
+    <div class="hero">
+      <div class="big">${Math.round(overall/5*100)}<span style="font-size:1.3rem;">%</span></div>
+      <div class="lab">만족도 환산</div>
+    </div>`;
+
+  // 섹션별 막대
+  let html = "";
+  const order = ["전반적 만족도","프로그램별","오늘의 수확","기타"];
+  const secNames = Object.keys(sections).sort((a,b)=>{
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    return (ia<0?99:ia) - (ib<0?99:ib);
+  });
+  secNames.forEach(sec => {
+    html += `<div class="secGroup"><div class="secTitle">${sec}</div>`;
+    sections[sec].forEach(it => {
+      const pct = (it.avg/5*100).toFixed(0);
+      html += `<div class="itemRow">
+        <span class="name">${it.q}</span>
+        <span class="barBox"><span class="bar" style="width:${pct}%;background:${barColor(it.avg)};"></span></span>
+        <span class="score">${it.avg.toFixed(2)}<span class="pt">/5</span><span class="ministar" style="color:#ffb03a;">${stars(it.avg)}</span></span>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  document.getElementById("sections").innerHTML = html || '<p class="msg">점수형 응답이 아직 없어요.</p>';
 
   // 전체 응답 표
   if(!rows.length){ document.getElementById("tableWrap").innerHTML='<p class="msg">아직 응답이 없어요.</p>'; updateSelCount(); return; }
@@ -158,6 +240,24 @@ function overallAvg(rows){
   return c? (sum/c).toFixed(2):"-";
 }
 function stripEmoji(s){ return (s||"").replace(/[🎤📚🎮💬🍱✨🛠💭💌🤗🥳]/g,"").trim(); }
+
+// 결과 요약 영역을 PNG 이미지로 저장
+async function saveReportImage(){
+  const area=document.getElementById("reportArea");
+  if(typeof html2canvas==="undefined"){
+    alert("이미지 저장 도구를 불러오지 못했어요. 인터넷 연결을 확인하거나, 화면을 직접 캡처해 주세요.");
+    return;
+  }
+  try{
+    const canvas=await html2canvas(area,{scale:2, backgroundColor:"#fffdf8", useCORS:true});
+    const link=document.createElement("a");
+    link.download="만족도조사_결과요약_"+new Date().toISOString().slice(0,10)+".png";
+    link.href=canvas.toDataURL("image/png");
+    link.click();
+  }catch(e){
+    alert("이미지 저장 중 문제가 생겼어요. 화면을 직접 캡처해 주세요. ("+e.message+")");
+  }
+}
 
 function downloadCSV(){
   const rows=DATA.rows;
