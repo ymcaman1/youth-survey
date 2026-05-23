@@ -26,6 +26,23 @@ export async function onRequestPost(context) {
       });
     }
 
+    // 여러 개 선택 삭제
+    if (Array.isArray(body.ids)) {
+      const ids = body.ids.map(n => parseInt(n, 10)).filter(Number.isInteger);
+      if (ids.length === 0) {
+        return new Response(JSON.stringify({ ok: false, error: "no valid ids" }), {
+          status: 400, headers: { "Content-Type": "application/json" }
+        });
+      }
+      const placeholders = ids.map(() => "?").join(",");
+      await env.DB.prepare(
+        `DELETE FROM responses WHERE id IN (${placeholders})`
+      ).bind(...ids).run();
+      return new Response(JSON.stringify({ ok: true, deleted: ids.length }), {
+        status: 200, headers: { "Content-Type": "application/json" }
+      });
+    }
+
     // 개별 삭제
     const id = parseInt(body.id, 10);
     if (!Number.isInteger(id)) {
